@@ -7,6 +7,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -16,14 +17,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+
+import org.apache.http.entity.mime.MultipartEntityBuilder;
 
 /**
  * @author wuhualu
@@ -232,19 +238,21 @@ public class HttpClientUtils {
 
         List<BasicNameValuePair> params = new LinkedList<>();
 
-        for (Map.Entry<String,Object> entry : entityMap.entrySet()) {
-            //键值对都不为空
-            if(!(StringUtils.isEmpty(entry.getKey()) || StringUtils.isEmpty(entry.getValue()))) {
-                //如果是List，单独处理
-                if(entry.getValue() instanceof Collection) {
-                    Collection collection = (Collection)entry.getValue();
-                    for(Object o : collection) {
-                        params.add(new BasicNameValuePair(entry.getKey(),o.toString()));
+        if (entityMap != null && entityMap.size() > 0) {
+            for (Map.Entry<String,Object> entry : entityMap.entrySet()) {
+                //键值对都不为空
+                if(!(StringUtils.isEmpty(entry.getKey()) || StringUtils.isEmpty(entry.getValue()))) {
+                    //如果是List，单独处理
+                    if(entry.getValue() instanceof Collection) {
+                        Collection collection = (Collection)entry.getValue();
+                        for(Object o : collection) {
+                            params.add(new BasicNameValuePair(entry.getKey(),o.toString()));
+                        }
+                    } else {
+                        params.add(new BasicNameValuePair(entry.getKey(), entry.getValue().toString()));
                     }
-                } else {
-                    params.add(new BasicNameValuePair(entry.getKey(), entry.getValue().toString()));
-                }
 
+                }
             }
         }
 
@@ -299,8 +307,66 @@ public class HttpClientUtils {
         return requestJsonPost(url,timeOut,headers,jsonString);
     }
 
+    /**
+     * 发送带文件的POST请求,Content-Type: multipart/form-data
+     * @param url 请求地址
+     * @param timeOut 超时时间
+     * @param headers 请求头
+     * @param entityMap 消息体，如果想传数组的话，请用Collection或继承自Collection的类,如List，ArrayList等
+     * @param fileNames 要上传的文件路径名，支持多个文件
+     * @return
+     */
+    public static String requestFormPost(String url, Integer timeOut, Map<String,String> headers, Map<String,String> entityMap, String... fileNames) {
+        //创建POST请求
+        HttpPost httpPost = new HttpPost(url);
+
+        MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create();
 
 
+        String filesKey = "files";
 
+        if (fileNames == null || fileNames.length == 0) {
+            logger.warn("文件列表为空");
+        } else {
+            for (String fileName : fileNames) {
+                File file = new File(fileName);
+                //多个文件的话，使用同一个key就行，后端用数组或集合进行接收即可
+                try {
+                    // 防止服务端收到的文件名乱码。 我们这里可以先将文件名URLEncode，然后服务端拿到文件名时在URLDecode。就能避免乱码问题。
+                    // 文件名其实是放在请求头的Content-Disposition里面进行传输的，如其值为form-data; name="files"; filename="头像.jpg"
+                    multipartEntityBuilder.addBinaryBody(filesKey, file, ContentType.DEFAULT_BINARY, URLEncoder.encode(file.getName(), "utf-8"));
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        if (entityMap != null || entityMap.size() > 0) {
+            // 其它参数(注:自定义contentType，设置UTF-8是为了防止服务端拿到的参数出现乱码)
+            ContentType contentType = ContentType.create("text/plain", Charset.forName("UTF-8"));
+
+            for (Map.Entry<String, String> entry : entityMap.entrySet()) {
+                if ( !( StringUtils.isEmpty(entry.getKey()) || StringUtils.isEmpty(entry.getValue()) ) ) {
+                    multipartEntityBuilder.addTextBody(entry.getKey(), entry.getValue(), contentType);
+                }
+            }
+        }
+
+        httpPost.setEntity(multipartEntityBuilder.build());
+
+        return execute(httpPost);
+    }
+
+    /**
+     * 发送带文件的POST请求,Content-Type: multipart/form-data
+     * @param url 请求地址
+     * @param timeOut 超时时间
+     * @param headers 请求头
+     * @param fileNames 要上传的文件路径名，支持多个文件
+     * @return
+     */
+    public static String requestFilePost(String url, Integer timeOut, Map<String,String> headers, String... fileNames) {
+        return requestFormPost(url, timeOut, headers, null, fileNames);
+    }
 
 }
