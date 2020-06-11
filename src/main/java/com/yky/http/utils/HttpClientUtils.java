@@ -313,17 +313,16 @@ public class HttpClientUtils {
      * @param timeOut 超时时间
      * @param headers 请求头
      * @param entityMap 消息体，如果想传数组的话，请用Collection或继承自Collection的类,如List，ArrayList等
+     * @param filesKey 文件在表单的key
      * @param fileNames 要上传的文件路径名，支持多个文件
      * @return
      */
-    public static String requestFormPost(String url, Integer timeOut, Map<String,String> headers, Map<String,String> entityMap, String... fileNames) {
+    public static String requestFormPost(String url, Integer timeOut, Map<String,String> headers, Map<String,String> entityMap, String filesKey, String... fileNames) {
         //创建POST请求
         HttpPost httpPost = new HttpPost(url);
 
         MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create();
 
-
-        String filesKey = "files";
 
         if (fileNames == null || fileNames.length == 0) {
             logger.warn("文件列表为空");
@@ -341,7 +340,7 @@ public class HttpClientUtils {
             }
         }
 
-        if (entityMap != null || entityMap.size() > 0) {
+        if (entityMap != null && entityMap.size() > 0) {
             // 其它参数(注:自定义contentType，设置UTF-8是为了防止服务端拿到的参数出现乱码)
             ContentType contentType = ContentType.create("text/plain", Charset.forName("UTF-8"));
 
@@ -351,6 +350,8 @@ public class HttpClientUtils {
                 }
             }
         }
+
+        setHeaders(headers, httpPost);
 
         httpPost.setEntity(multipartEntityBuilder.build());
 
@@ -365,8 +366,8 @@ public class HttpClientUtils {
      * @param fileNames 要上传的文件路径名，支持多个文件
      * @return
      */
-    public static String requestFilePost(String url, Integer timeOut, Map<String,String> headers, String... fileNames) {
-        return requestFormPost(url, timeOut, headers, null, fileNames);
+    public static String requestFilePost(String url, Integer timeOut, Map<String,String> headers, String filesKey, String... fileNames) {
+        return requestFormPost(url, timeOut, headers, null, filesKey, fileNames);
     }
 
 }
